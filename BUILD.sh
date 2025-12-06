@@ -4,50 +4,64 @@
 # Remember to check library update // stable?
 # Remember to clean /var/
 
+# Usage: bash BUILD.sh [-gh] [-ss] [-sd]
+#   -gh: use GitHub proxy while download openssl source
+#   -ss: Skip Sync build dir and download src
+#   -sd: Skip Dependence software check
+
 if [[ $EUID -ne 0 ]]; then
   echo "This script must be run as root or with sudo."
   exit 1
 fi
 
-set -e -x
+set -e
 
-apt update 
-apt upgrade -y
-apt -y install build-essential
-apt -y install curl
+if [ "$3" = "-sd" ]; then 
+  echo "Skip Dependence software check, run without -sd if any dependence unavailable."
+else
+  apt update 
+  apt upgrade -y
+  apt -y install build-essential curl rsync
+fi
 
 bpath=$(pwd)/build
 
-if [ -d "$bpath" ]; then
-  rm -rf $bpath
-fi
-
-mkdir -p $bpath
-
-# copy src / build script
-cp -r ./auto $bpath/auto
-cp -r ./conf $bpath/conf
-cp -r ./contrib $bpath/contrib
-cp -r ./docs $bpath/docs
-cp -r ./misc $bpath/misc
-cp -r ./src $bpath/src
-
-cd "$bpath"
-
-# download
-curl --progress-bar -L "https://onboardcloud.dl.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz" -o "${bpath}/pcre.tar.gz"
-curl --progress-bar -L "https://zlib.net/zlib-1.3.1.tar.gz" -o "${bpath}/zlib.tar.gz"
-
-if [ "$1" = "-gh" ]; then 
-  curl --progress-bar -L "https://gh-proxy.org/https://github.com/openssl/openssl/releases/download/openssl-3.6.0/openssl-3.6.0.tar.gz" -o "${bpath}/openssl.tar.gz"
+if [ "$2" = "-ss" ]; then 
+  echo "Skip Sync build dir and download src, run without -sd if src or lib src outdated."
+  rsync -a --delete ./src/ $bpath/src
+  cd "$bpath"
 else
-  curl --progress-bar -L "https://github.com/openssl/openssl/releases/download/openssl-3.6.0/openssl-3.6.0.tar.gz" -o "${bpath}/openssl.tar.gz"
-fi
+  if [ -d "$bpath" ]; then
+    rm -rf $bpath
+  fi
 
-# unzip
-tar xzf "pcre.tar.gz"
-tar xzf "zlib.tar.gz"
-tar xzf "openssl.tar.gz"
+  mkdir -p $bpath
+
+  # copy src / build script
+  cp -r ./auto $bpath/auto
+  cp -r ./conf $bpath/conf
+  cp -r ./contrib $bpath/contrib
+  cp -r ./docs $bpath/docs
+  cp -r ./misc $bpath/misc
+  cp -r ./src $bpath/src
+
+  cd "$bpath"
+
+  #download
+  curl --progress-bar -L "https://onboardcloud.dl.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz" -o "${bpath}/pcre.tar.gz"
+  curl --progress-bar -L "https://zlib.net/zlib-1.3.1.tar.gz" -o "${bpath}/zlib.tar.gz"
+
+  if [ "$1" = "-gh" ]; then 
+    curl --progress-bar -L "https://gh-proxy.org/https://github.com/openssl/openssl/releases/download/openssl-3.6.0/openssl-3.6.0.tar.gz" -o "${bpath}/openssl.tar.gz"
+  else
+    curl --progress-bar -L "https://github.com/openssl/openssl/releases/download/openssl-3.6.0/openssl-3.6.0.tar.gz" -o "${bpath}/openssl.tar.gz"
+  fi
+
+  # unzip
+  tar xzf "pcre.tar.gz"
+  tar xzf "zlib.tar.gz"
+  tar xzf "openssl.tar.gz"
+fi
 
 # build
 # following modules are not in use: grpc,mail,cgi,stream
@@ -104,7 +118,7 @@ make -j12
 cp "$bpath/objs/nginx" "$bpath/objs/nginx_"
 strip -s $bpath/objs/nginx
 
-echo "try see ./build/objs/nginx (strip) and ./build/objs/nginx_ (full)"
+echo "see ./build/objs/nginx (strip) and ./build/objs/nginx_ (full)"
 echo "  prefix=/usr/local/etc/nginx "
 echo "  sbin-path=/usr/bin/nginx "
 echo "  conf-path=/usr/local/etc/nginx/nginx.conf "
