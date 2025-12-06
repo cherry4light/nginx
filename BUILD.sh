@@ -119,7 +119,7 @@ cp "$bpath/objs/nginx" "$bpath/objs/nginx_"
 strip -s $bpath/objs/nginx
 
 echo "see ./build/objs/nginx (strip) and ./build/objs/nginx_ (full)"
-echo "  prefix=/usr/local/etc/nginx "
+echo "  prefix=/usr/local/nginx "
 echo "  sbin-path=/usr/bin/nginx "
 echo "  conf-path=/usr/local/etc/nginx/nginx.conf "
 echo "  error-log-path=/var/log/nginx/error.log "
