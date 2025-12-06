@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build env and server should be debian 13
+# Build env tested: debian13, wsl-debian
 # Remember to check library update // stable?
 # Remember to clean /var/
 
@@ -99,10 +99,10 @@ tar xzf "openssl.tar.gz"
   --with-openssl="$bpath/openssl-3.6.0" \
   --with-openssl-opt="no-weak-ssl-ciphers no-ssl3 no-shared -DOPENSSL_NO_HEARTBEATS -fstack-protector-strong"
   
-make -j2 # vm provide 4 core
+make -j12
 
 cp "$bpath/objs/nginx" "$bpath/objs/nginx_"
-strip
+strip -s $bpath/objs/nginx
 
 echo "try see ./build/objs/nginx (strip) and ./build/objs/nginx_ (full)"
 echo "  prefix=/usr/local/etc/nginx "
