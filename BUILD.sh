@@ -27,7 +27,7 @@ fi
 bpath=$(pwd)/build
 
 if [ "$2" = "-ss" ]; then 
-  echo "Skip Sync build dir and download src, run without -sd if src or lib src outdated."
+  echo "Skip Sync build dir and download src, run without -ss if src or lib src outdated."
   rsync -a --delete ./src/ $bpath/src
   cd "$bpath"
 else
