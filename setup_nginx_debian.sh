@@ -49,7 +49,7 @@ install_apparmor() {
 
   # runtime
   /proc/*/stat r,
-  /run/nginx.pid rw,
+  /var/run/nginx.pid rw,
 }
 APPEOF
   apparmor_parser -r "${aa_profile}" 2>/dev/null || true
