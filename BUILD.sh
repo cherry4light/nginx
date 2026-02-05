@@ -70,8 +70,8 @@ fi
   --sbin-path=/usr/bin/nginx \
   --conf-path=/usr/local/etc/nginx/nginx.conf \
   --error-log-path=/var/log/nginx/error.log \
-  --pid-path=/var/run/nginx.pid \
-  --lock-path=/var/run/nginx.lock \
+  --pid-path=/usr/local/etc/nginx/nginx.pid \
+  --lock-path=/usr/local/etc/nginx/nginx.lock \
   --user=nginx \
   --group=nginx \
   --without-select_module \
@@ -123,8 +123,8 @@ echo "  prefix=/usr/local/etc/nginx "
 echo "  sbin-path=/usr/bin/nginx "
 echo "  conf-path=/usr/local/etc/nginx/nginx.conf "
 echo "  error-log-path=/var/log/nginx/error.log "
-echo "  pid-path=/var/run/nginx.pid "
-echo "  lock-path=/var/run/nginx.lock "
+echo "  pid-path=/usr/local/etc/nginx/nginx.pid "
+echo "  lock-path=/usr/local/etc/nginx/nginx.lock "
 echo "  http-log-path=/var/log/nginx/access.log "
 echo "  http-client-body-temp-path=/var/cache/nginx/client_temp "
 echo "  http-proxy-temp-path=/var/cache/nginx/proxy_temp "

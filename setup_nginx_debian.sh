@@ -45,10 +45,11 @@ install_apparmor() {
 
   # runtime
   /proc/*/stat r,
-  /var/run/nginx.pid rw,
+  /usr/local/etc/nginx/nginx.pid rw,
 }
 APPEOF
   apparmor_parser -r "${aa_profile}" 2>/dev/null || true
+  systemctl reload apparmor
   echo "AppArmor config for nginx done."
 }
 
@@ -67,9 +68,7 @@ table inet filter {
     ip protocol icmp accept
     ip6 nexthdr ipv6-icmp accept
     tcp dport 22 accept comment "ssh"
-    tcp dport 80 accept comment "http"
-    tcp dport 443 accept comment "https"
-    tcp dport 4433 accept comment "nginx stream"
+    tcp dport 443 accept comment "https-nginx"
   }
   chain forward { type filter hook forward priority filter; policy drop; }
   chain output { type filter hook output priority filter; policy accept; }
@@ -97,7 +96,7 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-PIDFile=/var/run/nginx.pid
+PIDFile=/usr/local/etc/nginx/nginx.pid
 ExecStartPre=${NGINX_BIN} -t -p ${NGINX_CONF_PREFIX}
 ExecStart=${NGINX_BIN} -p ${NGINX_CONF_PREFIX}
 ExecStartPost=/bin/sleep 0.1
@@ -137,8 +136,6 @@ create_nginx_dirs() {
   # ssl directory (same as ssl path in nginx.conf, changed by sed to NGINX_CONF_PREFIX/ssl)
   mkdir -p "${NGINX_CONF_PREFIX}/ssl"
   chown nginx:nginx "${NGINX_CONF_PREFIX}/ssl"
-  touch /var/run/nginx.pid
-  chown nginx:nginx /var/run/nginx.pid
   echo "nginx dirs and log files created."
 }
 
