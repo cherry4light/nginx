@@ -2,7 +2,7 @@
 
 # Build env tested: debian13, wsl-debian
 # Remember to check library update // stable?
-# Remember to clean /var/
+# Remember to update permissions
 
 # Usage: bash BUILD.sh [-gh] [-ss] [-sd]
 #   -gh: use GitHub proxy while download openssl source

@@ -13,7 +13,7 @@ set -e
 
 SERVER_DOMAIN="${1:-nyalake.org}"
 NGINX_CONF_PREFIX="/usr/local/etc/nginx"
-NGINX_BIN="${NGINX_CONF_PREFIX}/nginx"
+NGINX_BIN="/usr/bin/nginx"
 NGINX_RELEASE_URL="https://github.com/cherry4light/nginx/releases/latest/download/nginx"
 NGINX_CONF_RAW="https://raw.githubusercontent.com/cherry4light/nginx/master/conf/nginx.conf"
 NGINX_MIME_RAW="https://raw.githubusercontent.com/cherry4light/nginx/master/conf/mime.types"
@@ -21,16 +21,12 @@ NGINX_MIME_RAW="https://raw.githubusercontent.com/cherry4light/nginx/master/conf
 # =============== AppArmor ===============
 # set AppArmor config for nginx (ports, path access etc.)
 install_apparmor() {
-  if ! command -v aa-status &>/dev/null; then
-    echo "Installing AppArmor..."
-    apt-get update -qq && apt-get install -y -qq apparmor
-  fi
-  # Profile name: binary path /usr/local/etc/nginx/nginx -> usr.local.etc.nginx.nginx
-  local aa_profile="/etc/apparmor.d/usr.local.etc.nginx.nginx"
+  # Profile name: binary path /usr/bin/nginx -> usr.bin.nginx
+  local aa_profile="/etc/apparmor.d/usr.bin.nginx"
   cat > "${aa_profile}" << APPEOF
 #include <tunables/global>
 # allowed permissions: read config, write log and cache, bind 80/443/4433 etc. ports
-/usr/local/etc/nginx/nginx flags=(complain) {
+/usr/bin/nginx flags=(complain) {
   #include <abstractions/base>
   #include <abstractions/nameservice>
   capability net_bind_service,
@@ -58,10 +54,6 @@ APPEOF
 
 # =============== nftables ===============
 install_nftables() {
-  if ! command -v nft &>/dev/null; then
-    echo "Installing nftables..."
-    apt-get update -qq && apt-get install -y -qq nftables
-  fi
   cat > /etc/nftables.conf << 'NFTEOF'
 #!/usr/sbin/nft -f
 flush ruleset
@@ -91,12 +83,8 @@ NFTEOF
 # =============== nginx user ===============
 # least privilege, no login, nginx-specific
 add_nginx_user() {
-  if ! getent passwd nginx &>/dev/null; then
-    useradd --system --no-create-home --shell /usr/sbin/nologin --comment "nginx daemon" nginx
-    echo "nginx user added."
-  else
-    echo "nginx user already exists."
-  fi
+  useradd --system --no-create-home --shell /usr/sbin/nologin --comment "nginx daemon" nginx
+  echo "nginx user added."
 }
 
 # =============== nginx systemd service ===============
@@ -109,9 +97,10 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-PIDFile=/run/nginx.pid
+PIDFile=/var/run/nginx.pid
 ExecStartPre=${NGINX_BIN} -t -p ${NGINX_CONF_PREFIX}
 ExecStart=${NGINX_BIN} -p ${NGINX_CONF_PREFIX}
+ExecStartPost=/bin/sleep 0.1
 ExecReload=/bin/kill -s HUP \$MAINPID
 ExecStop=/bin/kill -s QUIT \$MAINPID
 PrivateTmp=true
@@ -140,8 +129,7 @@ download_nginx_binary() {
 create_nginx_dirs() {
   # conf-path already created by download step
   mkdir -p /var/log/nginx
-  touch /var/log/nginx/error.log /var/log/nginx/access.log \
-        /var/log/nginx/stream_error.log /var/log/nginx/stream_access.log
+  touch /var/log/nginx/error.log /var/log/nginx/access.log 
   mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp \
            /var/cache/nginx/fastcgi_temp /var/cache/nginx/uwsgi_temp \
            /var/cache/nginx/scgi_temp
@@ -149,6 +137,8 @@ create_nginx_dirs() {
   # ssl directory (same as ssl path in nginx.conf, changed by sed to NGINX_CONF_PREFIX/ssl)
   mkdir -p "${NGINX_CONF_PREFIX}/ssl"
   chown nginx:nginx "${NGINX_CONF_PREFIX}/ssl"
+  touch /var/run/nginx.pid
+  chown nginx:nginx /var/run/nginx.pid
   echo "nginx dirs and log files created."
 }
 
@@ -178,6 +168,38 @@ test_nginx_config() {
   fi
 }
 
+# =============== write cloudflare origin cert ===============
+write_cf_cert() {
+  cat > "${NGINX_CONF_PREFIX}/ssl/origin_ca_rsa_root.pem" << EOF
+-----BEGIN CERTIFICATE-----
+MIIEADCCAuigAwIBAgIID+rOSdTGfGcwDQYJKoZIhvcNAQELBQAwgYsxCzAJBgNV
+BAYTAlVTMRkwFwYDVQQKExBDbG91ZEZsYXJlLCBJbmMuMTQwMgYDVQQLEytDbG91
+ZEZsYXJlIE9yaWdpbiBTU0wgQ2VydGlmaWNhdGUgQXV0aG9yaXR5MRYwFAYDVQQH
+Ew1TYW4gRnJhbmNpc2NvMRMwEQYDVQQIEwpDYWxpZm9ybmlhMB4XDTE5MDgyMzIx
+MDgwMFoXDTI5MDgxNTE3MDAwMFowgYsxCzAJBgNVBAYTAlVTMRkwFwYDVQQKExBD
+bG91ZEZsYXJlLCBJbmMuMTQwMgYDVQQLEytDbG91ZEZsYXJlIE9yaWdpbiBTU0wg
+Q2VydGlmaWNhdGUgQXV0aG9yaXR5MRYwFAYDVQQHEw1TYW4gRnJhbmNpc2NvMRMw
+EQYDVQQIEwpDYWxpZm9ybmlhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+AQEAwEiVZ/UoQpHmFsHvk5isBxRehukP8DG9JhFev3WZtG76WoTthvLJFRKFCHXm
+V6Z5/66Z4S09mgsUuFwvJzMnE6Ej6yIsYNCb9r9QORa8BdhrkNn6kdTly3mdnykb
+OomnwbUfLlExVgNdlP0XoRoeMwbQ4598foiHblO2B/LKuNfJzAMfS7oZe34b+vLB
+yrP/1bgCSLdc1AxQc1AC0EsQQhgcyTJNgnG4va1c7ogPlwKyhbDyZ4e59N5lbYPJ
+SmXI/cAe3jXj1FBLJZkwnoDKe0v13xeF+nF32smSH0qB7aJX2tBMW4TWtFPmzs5I
+lwrFSySWAdwYdgxw180yKU0dvwIDAQABo2YwZDAOBgNVHQ8BAf8EBAMCAQYwEgYD
+VR0TAQH/BAgwBgEB/wIBAjAdBgNVHQ4EFgQUJOhTV118NECHqeuU27rhFnj8KaQw
+HwYDVR0jBBgwFoAUJOhTV118NECHqeuU27rhFnj8KaQwDQYJKoZIhvcNAQELBQAD
+ggEBAHwOf9Ur1l0Ar5vFE6PNrZWrDfQIMyEfdgSKofCdTckbqXNTiXdgbHs+TWoQ
+wAB0pfJDAHJDXOTCWRyTeXOseeOi5Btj5CnEuw3P0oXqdqevM1/+uWp0CM35zgZ8
+VD4aITxity0djzE6Qnx3Syzz+ZkoBgTnNum7d9A66/V636x4vTeqbZFBr9erJzgz
+hhurjcoacvRNhnjtDRM0dPeiCJ50CP3wEYuvUzDHUaowOsnLCjQIkWbR7Ni6KEIk
+MOz2U0OBSif3FTkhCgZWQKOOLo1P42jHC3ssUZAtVNXrCk3fw9/E15k8NPkBazZ6
+0iykLhH1trywrKRMVw67F44IE8Y=
+-----END CERTIFICATE-----
+EOF
+
+  echo "Cloudflare origin CA cert saved."
+}
+
 # ---------- run ----------
 install_apparmor
 install_nftables
@@ -187,12 +209,12 @@ create_nginx_dirs
 add_nginx_service
 setup_nginx_conf
 test_nginx_config
+write_cf_cert
 
 echo ""
 echo "========== Success =========="
 echo "Please put SSL files in ${NGINX_CONF_PREFIX}/ssl/:"
-echo "  - origin.crt, origin.key, origin_ca_rsa_root.pem, git__ca.pem"
+echo "  - _.nyalake.org.crt, _.nyalake.org.key"
 echo "Then start nginx manually:"
 echo "  systemctl start nginx"
-echo "  systemctl enable nginx  # optional"
 echo "============================="
