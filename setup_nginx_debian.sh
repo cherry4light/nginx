@@ -164,7 +164,7 @@ test_nginx_config() {
   if "${NGINX_BIN}" -t -p "${NGINX_CONF_PREFIX}"; then
     echo "nginx config test OK."
   else
-    echo "WARNING: nginx -t failed. Please put SSL certs in ${NGINX_CONF_PREFIX}/ssl/ and run: ${NGINX_BIN} -t -p ${NGINX_CONF_PREFIX}"
+    echo "WARNING: nginx -t failed. Please put SSL certs in ${NGINX_CONF_PREFIX}/ssl/ and run: ${NGINX_BIN} -t -p ${NGINX_CONF_PREFIX}/nginx.conf"
   fi
 }
 
@@ -218,3 +218,5 @@ echo "  - _.nyalake.org.crt, _.nyalake.org.key"
 echo "Then start nginx manually:"
 echo "  systemctl start nginx"
 echo "============================="
+
+rm -rf $0
